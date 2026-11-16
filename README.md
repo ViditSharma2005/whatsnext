@@ -1,4 +1,4 @@
-# Whats Next ?
+# Whats Next...
 
 A mobile-first Next.js contest calendar. No accounts. Shows the next contest, live/today status, this week, and one motivational quote with anonymous community votes.
 

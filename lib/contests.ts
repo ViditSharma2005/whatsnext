@@ -16,7 +16,13 @@ function safeContest(x:any):Contest | null {
     let end = x.endTime;
     if (x.site === 'leetcode' && /^(weekly|biweekly) contest/i.test(x.title) && end - x.startTime === 324000000) end = x.startTime + 5400000;
     if (end <= x.startTime) return null;
-    return {id:`${x.site}:${u.pathname}`,platform:x.site,name:x.title,url:u.toString(),startTime:new Date(x.startTime).toISOString(),endTime:new Date(end).toISOString(),durationMin:(end-x.startTime)/60000};
+    const cfId = x.site === 'codeforces' ? u.pathname.match(/^\/contests?\/(\d+)\/?$/)?.[1] : undefined;
+    // Preserve a stable identity across the two Codeforces URL formats.
+    const id = cfId ? `codeforces:/contest/${cfId}` : `${x.site}:${u.pathname}`;
+    // The singular /contest route redirects to the homepage before the start.
+    // Return the official contest detail route for future rounds.
+    const url = cfId && x.startTime > Date.now() ? `https://codeforces.com/contests/${cfId}` : u.toString();
+    return {id,platform:x.site,name:x.title,url,startTime:new Date(x.startTime).toISOString(),endTime:new Date(end).toISOString(),durationMin:(end-x.startTime)/60000};
   } catch { return null; }
 }
 async function getGfg() {
@@ -52,6 +58,8 @@ async function loadContests():Promise<ContestResponse> {
     const keep = old.contests.filter(c => (failed.includes(c.platform) && Date.parse(c.endTime) > now) || (Date.parse(c.startTime) <= now && Date.parse(c.startTime) >= now-8*86400000));
     const ids = new Set(list.map(c => c.id)); for (const c of keep) if (!ids.has(c.id)) list.push(c);
   }
+  // Collapse actual duplicates by platform/external ID, never by platform and time.
+  list = [...new Map(list.map(contest => [contest.id, contest])).values()];
   list.sort((a,b)=>a.startTime.localeCompare(b.startTime));
   const totalFailure = !aggregateOk && !cfOk && gfg.status !== 'fulfilled';
   const result:ContestResponse = {contests:list,failed,fetchedAt:totalFailure && old ? old.fetchedAt : new Date().toISOString(),stale:totalFailure && !!old,notes};
